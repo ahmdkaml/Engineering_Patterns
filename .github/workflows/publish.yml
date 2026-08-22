@@ -45,12 +45,130 @@ jobs:
         run: |
           cat "${{ steps.publish.outputs.publish_file }}"
 
-      - name: Check LinkedIn token
+      - name: Check publish flag
         if: steps.publish.outputs.publish_file != ''
+        id: content
+        env:
+          PUBLISH_FILE: ${{ steps.publish.outputs.publish_file }}
+        shell: bash
+        run: |
+          publish=$(jq -r '.publish' "$PUBLISH_FILE")
+
+          if [ "$publish" != "true" ]; then
+            echo "publish.json has publish=false. Nothing to publish."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "publish.json has publish=true."
+
+          title=$(jq -r '.title' "$PUBLISH_FILE")
+          content=$(jq -r '.content' "$PUBLISH_FILE")
+          url=$(jq -r '.url' "$PUBLISH_FILE")
+
+          if [ -z "$title" ] || [ "$title" = "null" ]; then
+            echo "Missing title."
+            exit 1
+          fi
+
+          if [ -z "$content" ] || [ "$content" = "null" ]; then
+            echo "Missing content."
+            exit 1
+          fi
+
+          if [ -z "$url" ] || [ "$url" = "null" ]; then
+            echo "Missing url."
+            exit 1
+          fi
+
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Get LinkedIn member ID
+        if: steps.content.outputs.should_publish == 'true'
+        id: linkedin
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        shell: bash
         run: |
-          curl --fail-with-body \
+          response=$(curl --fail-with-body \
             -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
             -H "X-Restli-Protocol-Version: 2.0.0" \
-            "https://api.linkedin.com/v2/me"
+            "https://api.linkedin.com/v2/userinfo")
+
+          member_id=$(echo "$response" | jq -r '.sub')
+
+          if [ -z "$member_id" ] || [ "$member_id" = "null" ]; then
+            echo "Could not determine LinkedIn member ID."
+            exit 1
+          fi
+
+          echo "LinkedIn member identity verified."
+
+          echo "member_id=$member_id" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to LinkedIn
+        if: steps.content.outputs.should_publish == 'true'
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          PUBLISH_FILE: ${{ steps.publish.outputs.publish_file }}
+          MEMBER_ID: ${{ steps.linkedin.outputs.member_id }}
+        shell: bash
+        run: |
+          title=$(jq -r '.title' "$PUBLISH_FILE")
+          content=$(jq -r '.content' "$PUBLISH_FILE")
+          url=$(jq -r '.url' "$PUBLISH_FILE")
+
+          tags=$(jq -r '
+            if .tags then
+              .tags | map("#" + .) | join(" ")
+            else
+              ""
+            end
+          ' "$PUBLISH_FILE")
+
+          commentary="$content"
+
+          if [ -n "$tags" ]; then
+            commentary="$commentary
+
+$tags"
+          fi
+
+          jq -n \
+            --arg author "urn:li:person:$MEMBER_ID" \
+            --arg commentary "$commentary" \
+            --arg title "$title" \
+            --arg url "$url" \
+            '{
+              author: $author,
+              commentary: $commentary,
+              visibility: "PUBLIC",
+              distribution: {
+                feedDistribution: "MAIN_FEED",
+                targetEntities: [],
+                thirdPartyDistributionChannels: []
+              },
+              content: {
+                article: {
+                  source: $url,
+                  title: $title,
+                  description: $commentary
+                }
+              },
+              lifecycleState: "PUBLISHED",
+              isReshareDisabledByAuthor: false
+            }' > payload.json
+
+          echo "Publishing: $title"
+
+          curl --fail-with-body \
+            --request POST \
+            --url "https://api.linkedin.com/rest/posts" \
+            --header "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
+            --header "Content-Type: application/json" \
+            --header "Linkedin-Version: 202608" \
+            --header "X-Restli-Protocol-Version: 2.0.0" \
+            --data @payload.json
+
+          echo
+          echo "LinkedIn publication successful."

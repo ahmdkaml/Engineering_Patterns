@@ -1,6 +1,6 @@
 {
   "publish": true,
-  "title": "Built a GitHub Action for Automated Implementation Publishing 0",
+  "title": "Built a GitHub Action for Automated Implementation Publishing",
   "content": "Built the first version of a GitHub Actions workflow that detects changes to publish.json files and prepares their contents for automated publishing. The workflow supports multiple implementation directories, processes only the publish.json changed in the push, and stops when more than one publish.json is changed in the same push.",
   "url": "https://github.com/YOUR_USERNAME/YOUR_REPOSITORY",
   "tags": [

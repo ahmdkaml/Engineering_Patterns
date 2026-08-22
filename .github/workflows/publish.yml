@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
@@ -19,8 +19,12 @@ jobs:
         id: publish
         shell: bash
         run: |
-          files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" \
-            | grep -E '(^|/)publish\.json$' || true)
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BEFORE_SHA" ]; then
+            BEFORE_SHA="HEAD~1"
+          fi
+
+          files=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -E '(^|/)publish\.json$' || true)
 
           count=$(printf '%s\n' "$files" | sed '/^$/d' | wc -l)
 
@@ -90,7 +94,7 @@ jobs:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
         shell: bash
         run: |
-          response=$(curl --fail-with-body \
+          response=$(curl -s --fail-with-body \
             -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
             -H "X-Restli-Protocol-Version: 2.0.0" \
             "https://api.linkedin.com/v2/userinfo")
@@ -103,7 +107,6 @@ jobs:
           fi
 
           echo "LinkedIn member identity verified."
-
           echo "member_id=$member_id" >> "$GITHUB_OUTPUT"
 
       - name: Publish to LinkedIn
@@ -129,9 +132,7 @@ jobs:
           commentary="$content"
 
           if [ -n "$tags" ]; then
-            commentary="$commentary
-
-$tags"
+            commentary=$(printf "%s\n\n%s" "$commentary" "$tags")
           fi
 
           jq -n \
@@ -161,7 +162,7 @@ $tags"
 
           echo "Publishing: $title"
 
-          curl --fail-with-body \
+          curl -s --fail-with-body \
             --request POST \
             --url "https://api.linkedin.com/rest/posts" \
             --header "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
@@ -170,5 +171,5 @@ $tags"
             --header "X-Restli-Protocol-Version: 2.0.0" \
             --data @payload.json
 
-          echo
+          echo ""
           echo "LinkedIn publication successful."

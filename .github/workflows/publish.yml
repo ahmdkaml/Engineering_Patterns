@@ -1,0 +1,78 @@
+name: Publish Implementation
+
+on:
+  push:
+    paths:
+      - '**/publish.json'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Find changed publish.json files
+        id: publish
+        shell: bash
+        run: |
+          files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" \
+            | grep -E '(^|/)publish\.json$' || true)
+
+          count=$(printf '%s\n' "$files" | sed '/^$/d' | wc -l)
+
+          if [ "$count" -gt 1 ]; then
+            echo "More than one publish.json was changed in this push:"
+            printf '%s\n' "$files"
+            exit 1
+          fi
+
+          if [ "$count" -eq 0 ]; then
+            echo "No publish.json changed."
+            exit 0
+          fi
+
+          publish_file="$files"
+
+          echo "publish_file=$publish_file" >> "$GITHUB_OUTPUT"
+          echo "Changed publish.json: $publish_file"
+
+      - name: Read publish.json
+        if: steps.publish.outputs.publish_file != ''
+        run: |
+          cat "${{ steps.publish.outputs.publish_file }}"
+
+      - name: Verify LinkedIn authentication
+        if: steps.publish.outputs.publish_file != ''
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        run: |
+          curl --fail-with-body \
+            -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
+            -H "X-Restli-Protocol-Version: 2.0.0" \
+            "https://api.linkedin.com/v2/userinfo"
+
+      - name: Get LinkedIn member ID
+        if: steps.publish.outputs.publish_file != ''
+        id: linkedin
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+        run: |
+          response=$(curl --fail-with-body \
+            -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
+            -H "X-Restli-Protocol-Version: 2.0.0" \
+            "https://api.linkedin.com/v2/userinfo")
+
+          echo "LinkedIn authentication successful."
+
+          member_id=$(echo "$response" | jq -r '.sub')
+
+          if [ -z "$member_id" ] || [ "$member_id" = "null" ]; then
+            echo "Could not determine LinkedIn member ID."
+            exit 1
+          fi
+
+          echo "member_id=$member_id" >> "$GITHUB_OUTPUT"

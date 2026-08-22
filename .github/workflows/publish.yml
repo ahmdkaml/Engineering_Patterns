@@ -45,7 +45,7 @@ jobs:
         run: |
           cat "${{ steps.publish.outputs.publish_file }}"
 
-      - name: Verify LinkedIn authentication
+      - name: Check LinkedIn token
         if: steps.publish.outputs.publish_file != ''
         env:
           LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
@@ -53,26 +53,4 @@ jobs:
           curl --fail-with-body \
             -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
             -H "X-Restli-Protocol-Version: 2.0.0" \
-            "https://api.linkedin.com/v2/userinfo"
-
-      - name: Get LinkedIn member ID
-        if: steps.publish.outputs.publish_file != ''
-        id: linkedin
-        env:
-          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-        run: |
-          response=$(curl --fail-with-body \
-            -H "Authorization: Bearer $LINKEDIN_ACCESS_TOKEN" \
-            -H "X-Restli-Protocol-Version: 2.0.0" \
-            "https://api.linkedin.com/v2/userinfo")
-
-          echo "LinkedIn authentication successful."
-
-          member_id=$(echo "$response" | jq -r '.sub')
-
-          if [ -z "$member_id" ] || [ "$member_id" = "null" ]; then
-            echo "Could not determine LinkedIn member ID."
-            exit 1
-          fi
-
-          echo "member_id=$member_id" >> "$GITHUB_OUTPUT"
+            "https://api.linkedin.com/v2/me"

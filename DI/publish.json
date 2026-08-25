@@ -1,0 +1,13 @@
+{
+"publish": true,
+"title": "Dependency Injection: When and Why to Use It",
+"content": "Dependency Injection (DI) separates a class from the responsibility of constructing its dependencies. Instead of a class deciding how to create or handle CSV, JSON, or XML readers, those dependencies are provided at runtime.\n\nWithout DI, keeping related logic centralized can be perfectly reasonable when the functionality is small, stable, and always used together. The downside appears when a class accumulates multiple responsibilities, especially format-specific logic and growing if/else branches. Changes then require modifying the same class, and testing individual parts becomes harder.\n\nWith DI, responsibilities can be separated behind interfaces and implementations can be substituted independently. This is especially useful when a component needs to be tested in isolation or when different implementations may be required.\n\nDI is not a rule to avoid every new statement or create an interface for every class. If a centralized class is simpler and the logic naturally belongs together, keeping it centralized can be the better choice. The practical signal for DI is when a class has too many responsibilities, too many implementation-specific decisions, or when a piece of the application would benefit from being tested independently.\n\nImplementation: https://github.com/ahmdkaml/Engineering_Patterns/DI",
+"url": "https://github.com/ahmdkaml/Engineering_Patterns",
+"tags": [
+"DependencyInjection",
+"DesignPatterns",
+"SoftwareArchitecture",
+"Testing",
+"CSharp"
+]
+}

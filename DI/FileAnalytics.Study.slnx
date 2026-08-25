@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="FileAnalytics.DI/FileAnalytics.DI.csproj" />
+  <Project Path="FileAnalytics.NoDI/FileAnalytics.NoDI.csproj" />
+</Solution>

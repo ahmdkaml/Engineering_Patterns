@@ -1,0 +1,9 @@
+<sales>
+    <sale>
+        <saleId>S001</saleId>
+        <customer>Alice</customer>
+        <product>Laptop</product>
+        <quantity>2</quantity>
+        <unitPrice>1200</unitPrice>
+    </sale>
+</sales>

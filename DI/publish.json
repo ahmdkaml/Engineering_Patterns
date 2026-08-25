@@ -1,13 +1,13 @@
 {
   "publish": true,
-  "title": "Built a GitHub Action for Automated Implementation Publishing v1.0",
-  "content": "Built the first version of a GitHub Actions workflow that detects changes to publish.json files and prepares their contents for automated publishing. The workflow supports multiple implementation directories, processes only the publish.json changed in the push, and stops when more than one publish.json is changed in the same push.",
-  "url": "https://github.com/ahmdkaml/Engineering_Patterns",
+  "title": "Dependency Injection: Separating Responsibilities",
+  "content": "Dependency Injection separates a class from the responsibility of creating its dependencies. Instead of a class knowing how to handle CSV, JSON, and XML directly, those implementations can be provided at runtime.\n\nWithout DI, centralized logic can be perfectly reasonable when the functionality is small, stable, and naturally belongs together. The problem appears when a class accumulates too many responsibilities, especially format-specific logic and growing if/else branches.\n\nDI becomes useful when responsibilities need to change independently, when implementations may be substituted, or when a component needs to be tested in isolation.\n\nDI is not a rule to avoid every new statement or create an interface for every class. If centralized logic is simpler, keep it centralized. Use DI when it provides a real separation or testing benefit.",
+  "url": "https://github.com/ahmdkaml/Engineering_Patterns/DI",
   "tags": [
-    "GitHubActions",
-    "Automation",
-    "CI/CD",
-    "DevOps",
-    "API"
+    "DependencyInjection",
+    "DesignPatterns",
+    "SoftwareArchitecture",
+    "Testing",
+    "CSharp"
   ]
 }

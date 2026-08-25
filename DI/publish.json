@@ -1,13 +1,13 @@
 {
-"publish": true,
-"title": "Dependency Injection: When and Why to Use It",
-"content": "Dependency Injection (DI) separates a class from the responsibility of constructing its dependencies. Instead of a class deciding how to handle CSV, JSON, or XML readers, those dependencies are provided at runtime.\n\nWithout DI, keeping related logic centralized can be reasonable when functionality is small, stable, and naturally belongs together. The problems appear when a class accumulates multiple responsibilities, format-specific logic, and growing if/else branches. Changes become harder to isolate, and testing individual parts becomes more difficult.\n\nWith DI, responsibilities can be separated behind interfaces, allowing implementations to be replaced independently. This is especially useful when a component needs to be tested in isolation or when different implementations may be required.\n\nDI is not a rule to avoid every new statement or create an interface for every class. If centralized logic is simpler and the responsibilities naturally belong together, keeping it centralized can be the better choice. A good signal for DI is when a class has too many responsibilities, too many implementation-specific decisions, or when a component would benefit from independent testing.\n\nImplementation: https://github.com/ahmdkaml/Engineering_Patterns/DI",
-"url": "https://github.com/ahmdkaml/Engineering_Patterns",
-"tags": [
-"DependencyInjection",
-"DesignPatterns",
-"SoftwareArchitecture",
-"Testing",
-"CSharp"
-]
+  "publish": true,
+  "title": "Dependency Injection: When and Why to Use It",
+  "content": "Dependency Injection (DI) separates a class from the responsibility of constructing its dependencies. Instead of a class deciding how to handle CSV, JSON, or XML readers, those dependencies are provided at runtime.\n\nWithout DI, keeping related logic centralized can be reasonable when functionality is small, stable, and naturally belongs together. The problems appear when a class accumulates multiple responsibilities, format-specific logic, and growing if/else branches. Changes become harder to isolate, and testing individual parts becomes more difficult.\n\nWith DI, responsibilities can be separated behind interfaces, allowing implementations to be replaced independently. This is especially useful when a component needs to be tested in isolation or when different implementations may be required.\n\nDI is not a rule to avoid every new statement or create an interface for every class. If centralized logic is simpler and the responsibilities naturally belong together, keeping it centralized can be the better choice. A good signal for DI is when a class has too many responsibilities, too many implementation-specific decisions, or when a component would benefit from independent testing.\n\nImplementation: https://github.com/ahmdkaml/Engineering_Patterns/DI",
+  "url": "https://github.com/ahmdkaml/Engineering_Patterns",
+  "tags": [
+    "DependencyInjection",
+    "DesignPatterns",
+    "SoftwareArchitecture",
+    "Testing",
+    "CSharp"
+  ]
 }

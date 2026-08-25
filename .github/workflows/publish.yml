@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 2
 
       - name: Find changed publish.json files
         id: publish
@@ -25,10 +25,11 @@ jobs:
           fi
 
           files=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -E '(^|/)publish\.json$' || true)
+
           count=$(printf '%s\n' "$files" | sed '/^$/d' | wc -l)
 
           if [ "$count" -gt 1 ]; then
-            echo "::error::More than one publish.json was changed in this push:"
+            echo "More than one publish.json was changed in this push:"
             printf '%s\n' "$files"
             exit 1
           fi
@@ -39,6 +40,7 @@ jobs:
           fi
 
           publish_file="$files"
+
           echo "publish_file=$publish_file" >> "$GITHUB_OUTPUT"
           echo "Changed publish.json: $publish_file"
 
@@ -54,7 +56,7 @@ jobs:
           PUBLISH_FILE: ${{ steps.publish.outputs.publish_file }}
         shell: bash
         run: |
-          publish=$(jq -r '.publish // false' "$PUBLISH_FILE")
+          publish=$(jq -r '.publish' "$PUBLISH_FILE")
 
           if [ "$publish" != "true" ]; then
             echo "publish.json has publish=false. Nothing to publish."
@@ -64,12 +66,22 @@ jobs:
 
           echo "publish.json has publish=true."
 
-          title=$(jq -r '.title // empty' "$PUBLISH_FILE")
-          content=$(jq -r '.content // empty' "$PUBLISH_FILE")
-          url=$(jq -r '.url // empty' "$PUBLISH_FILE")
+          title=$(jq -r '.title' "$PUBLISH_FILE")
+          content=$(jq -r '.content' "$PUBLISH_FILE")
+          url=$(jq -r '.url' "$PUBLISH_FILE")
 
-          if [ -z "$title" ] || [ -z "$content" ] || [ -z "$url" ]; then
-            echo "::error::Missing required fields (title, content, or url) in $PUBLISH_FILE."
+          if [ -z "$title" ] || [ "$title" = "null" ]; then
+            echo "Missing title."
+            exit 1
+          fi
+
+          if [ -z "$content" ] || [ "$content" = "null" ]; then
+            echo "Missing content."
+            exit 1
+          fi
+
+          if [ -z "$url" ] || [ "$url" = "null" ]; then
+            echo "Missing url."
             exit 1
           fi
 
@@ -87,10 +99,10 @@ jobs:
             -H "X-Restli-Protocol-Version: 2.0.0" \
             "https://api.linkedin.com/v2/userinfo")
 
-          member_id=$(echo "$response" | jq -r '.sub // empty')
+          member_id=$(echo "$response" | jq -r '.sub')
 
-          if [ -z "$member_id" ]; then
-            echo "::error::Could not determine LinkedIn member ID."
+          if [ -z "$member_id" ] || [ "$member_id" = "null" ]; then
+            echo "Could not determine LinkedIn member ID."
             exit 1
           fi
 
@@ -105,14 +117,32 @@ jobs:
           MEMBER_ID: ${{ steps.linkedin.outputs.member_id }}
         shell: bash
         run: |
-          # Construct payload directly in jq to preserve multiline formatting safely
-          jq --arg author "urn:li:person:$MEMBER_ID" '
-            . as $in |
-            ($in.tags // [] | map("#" + .) | join(" ")) as $tagStr |
-            ($in.content + (if ($tagStr | length) > 0 then "\n\n" + $tagStr else "" end)) as $fullCommentary |
-            {
+          title=$(jq -r '.title' "$PUBLISH_FILE")
+          content=$(jq -r '.content' "$PUBLISH_FILE")
+          url=$(jq -r '.url' "$PUBLISH_FILE")
+
+          tags=$(jq -r '
+            if .tags then
+              .tags | map("#" + .) | join(" ")
+            else
+              ""
+            end
+          ' "$PUBLISH_FILE")
+
+          commentary="$content"
+
+          if [ -n "$tags" ]; then
+            commentary=$(printf "%s\n\n%s" "$commentary" "$tags")
+          fi
+
+          jq -n \
+            --arg author "urn:li:person:$MEMBER_ID" \
+            --arg commentary "$commentary" \
+            --arg title "$title" \
+            --arg url "$url" \
+            '{
               author: $author,
-              commentary: $fullCommentary,
+              commentary: $commentary,
               visibility: "PUBLIC",
               distribution: {
                 feedDistribution: "MAIN_FEED",
@@ -121,20 +151,17 @@ jobs:
               },
               content: {
                 article: {
-                  source: $in.url,
-                  title: $in.title,
-                  description: $in.content
+                  source: $url,
+                  title: $title,
+                  description: $commentary
                 }
               },
               lifecycleState: "PUBLISHED",
               isReshareDisabledByAuthor: false
-            }
-          ' "$PUBLISH_FILE" > payload.json
+            }' > payload.json
 
-          echo "Generated payload:"
-          cat payload.json
+          echo "Publishing: $title"
 
-          echo -e "\nPublishing to LinkedIn..."
           curl -s --fail-with-body \
             --request POST \
             --url "https://api.linkedin.com/rest/posts" \
@@ -144,4 +171,5 @@ jobs:
             --header "X-Restli-Protocol-Version: 2.0.0" \
             --data @payload.json
 
-          echo -e "\nLinkedIn publication successful."
+          echo ""
+          echo "LinkedIn publication successful."

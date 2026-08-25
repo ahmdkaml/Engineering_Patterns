@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Find changed publish.json files
         id: publish
@@ -25,11 +25,10 @@ jobs:
           fi
 
           files=$(git diff --name-only "$BEFORE_SHA" "${{ github.sha }}" | grep -E '(^|/)publish\.json$' || true)
-
           count=$(printf '%s\n' "$files" | sed '/^$/d' | wc -l)
 
           if [ "$count" -gt 1 ]; then
-            echo "More than one publish.json was changed in this push:"
+            echo "::error::More than one publish.json was changed in this push:"
             printf '%s\n' "$files"
             exit 1
           fi
@@ -40,7 +39,6 @@ jobs:
           fi
 
           publish_file="$files"
-
           echo "publish_file=$publish_file" >> "$GITHUB_OUTPUT"
           echo "Changed publish.json: $publish_file"
 
@@ -56,7 +54,7 @@ jobs:
           PUBLISH_FILE: ${{ steps.publish.outputs.publish_file }}
         shell: bash
         run: |
-          publish=$(jq -r '.publish' "$PUBLISH_FILE")
+          publish=$(jq -r '.publish // false' "$PUBLISH_FILE")
 
           if [ "$publish" != "true" ]; then
             echo "publish.json has publish=false. Nothing to publish."
@@ -66,22 +64,12 @@ jobs:
 
           echo "publish.json has publish=true."
 
-          title=$(jq -r '.title' "$PUBLISH_FILE")
-          content=$(jq -r '.content' "$PUBLISH_FILE")
-          url=$(jq -r '.url' "$PUBLISH_FILE")
+          title=$(jq -r '.title // empty' "$PUBLISH_FILE")
+          content=$(jq -r '.content // empty' "$PUBLISH_FILE")
+          url=$(jq -r '.url // empty' "$PUBLISH_FILE")
 
-          if [ -z "$title" ] || [ "$title" = "null" ]; then
-            echo "Missing title."
-            exit 1
-          fi
-
-          if [ -z "$content" ] || [ "$content" = "null" ]; then
-            echo "Missing content."
-            exit 1
-          fi
-
-          if [ -z "$url" ] || [ "$url" = "null" ]; then
-            echo "Missing url."
+          if [ -z "$title" ] || [ -z "$content" ] || [ -z "$url" ]; then
+            echo "::error::Missing required fields (title, content, or url) in $PUBLISH_FILE."
             exit 1
           fi
 
@@ -99,10 +87,10 @@ jobs:
             -H "X-Restli-Protocol-Version: 2.0.0" \
             "https://api.linkedin.com/v2/userinfo")
 
-          member_id=$(echo "$response" | jq -r '.sub')
+          member_id=$(echo "$response" | jq -r '.sub // empty')
 
-          if [ -z "$member_id" ] || [ "$member_id" = "null" ]; then
-            echo "Could not determine LinkedIn member ID."
+          if [ -z "$member_id" ]; then
+            echo "::error::Could not determine LinkedIn member ID."
             exit 1
           fi
 
@@ -139,6 +127,7 @@ jobs:
             --arg author "urn:li:person:$MEMBER_ID" \
             --arg commentary "$commentary" \
             --arg title "$title" \
+            --arg description "$content" \
             --arg url "$url" \
             '{
               author: $author,
@@ -153,7 +142,7 @@ jobs:
                 article: {
                   source: $url,
                   title: $title,
-                  description: $commentary
+                  description: $description
                 }
               },
               lifecycleState: "PUBLISHED",

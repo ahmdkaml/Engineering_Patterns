@@ -105,33 +105,14 @@ jobs:
           MEMBER_ID: ${{ steps.linkedin.outputs.member_id }}
         shell: bash
         run: |
-          title=$(jq -r '.title' "$PUBLISH_FILE")
-          content=$(jq -r '.content' "$PUBLISH_FILE")
-          url=$(jq -r '.url' "$PUBLISH_FILE")
-
-          tags=$(jq -r '
-            if .tags then
-              .tags | map("#" + .) | join(" ")
-            else
-              ""
-            end
-          ' "$PUBLISH_FILE")
-
-          commentary="$content"
-
-          if [ -n "$tags" ]; then
-            commentary=$(printf "%s\n\n%s" "$commentary" "$tags")
-          fi
-
-          jq -n \
-            --arg author "urn:li:person:$MEMBER_ID" \
-            --arg commentary "$commentary" \
-            --arg title "$title" \
-            --arg description "$content" \
-            --arg url "$url" \
-            '{
+          # Construct payload directly in jq to preserve multiline formatting safely
+          jq --arg author "urn:li:person:$MEMBER_ID" '
+            . as $in |
+            ($in.tags // [] | map("#" + .) | join(" ")) as $tagStr |
+            ($in.content + (if ($tagStr | length) > 0 then "\n\n" + $tagStr else "" end)) as $fullCommentary |
+            {
               author: $author,
-              commentary: $commentary,
+              commentary: $fullCommentary,
               visibility: "PUBLIC",
               distribution: {
                 feedDistribution: "MAIN_FEED",
@@ -140,17 +121,20 @@ jobs:
               },
               content: {
                 article: {
-                  source: $url,
-                  title: $title,
-                  description: $description
+                  source: $in.url,
+                  title: $in.title,
+                  description: $in.content
                 }
               },
               lifecycleState: "PUBLISHED",
               isReshareDisabledByAuthor: false
-            }' > payload.json
+            }
+          ' "$PUBLISH_FILE" > payload.json
 
-          echo "Publishing: $title"
+          echo "Generated payload:"
+          cat payload.json
 
+          echo -e "\nPublishing to LinkedIn..."
           curl -s --fail-with-body \
             --request POST \
             --url "https://api.linkedin.com/rest/posts" \
@@ -160,5 +144,4 @@ jobs:
             --header "X-Restli-Protocol-Version: 2.0.0" \
             --data @payload.json
 
-          echo ""
-          echo "LinkedIn publication successful."
+          echo -e "\nLinkedIn publication successful."
